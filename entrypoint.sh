@@ -1,6 +1,70 @@
 #!/bin/bash
 set -e
 
+if [ "$#" -eq 1 ] && [ "$1" = "plot" ]; then
+  # generates multiple graphs out of radosbench output
+  #
+  # expects to have results stored in the following folder structure:
+  #
+  #   * results/osd_count/num_replica/obj_size/repetition_type.csv
+  #
+  # where
+
+  if [ ! -n "$RESULTS_PATH" ]; then
+    echo "ERROR: RESULTS_PATH must be defined"
+    exit 1
+  fi
+
+  if [ ! -n "$MAX_OSD" ]; then
+    echo "ERROR: MAX_OSD must be defined"
+    exit 1
+  fi
+
+  if [ ! -n "$EXPERIMENT" ]; then
+    echo "ERROR: EXPERIMENT must be defined"
+    exit 1
+  fi
+
+  throughput=${RESULTS_PATH}/${EXPERIMENT}_per-osd-write-throughput.csv
+  latency=${RESULTS_PATH}/${EXPERIMENT}_per-osd-write-latency.csv
+  rw=${RESULTS_PATH}/${EXPERIMENT}_per-osd-rw-throughput.csv
+  scale=${RESULTS_PATH}/${EXPERIMENT}_per-osd-scalable-throughput.csv
+  expath=$RESULTS_PATH/$EXPERIMENT
+
+  # headers
+  echo "replicas, size, throughput" > $throughput
+  echo "replicas, size, latency" > $latency
+  echo "replicas, size, read_throughput, write_throughput" > $rw
+  echo "num_osd, replicas, size, throughput" > $scale
+
+  for replicas in `ls $expath/$MAX_OSD/` ; do
+    for size in `ls $expath/$MAX_OSD/$replicas/` ; do
+      tp=`grep 'Bandwidth (MB/sec):' $expath/$MAX_OSD/$replicas/$size/1_write.csv | sed 's/Bandwidth (MB\/sec): *//'`
+      lt=`grep 'Average Latency:' $expath/$MAX_OSD/$replicas/$size/1_write.csv | sed 's/Average Latency: *//'`
+      r=`grep 'Bandwidth (MB/sec):' $expath/$MAX_OSD/$replicas/$size/1_seq.csv | sed 's/Bandwidth (MB\/sec) *//'`
+      echo "$replicas, $size, $tp" >> $throughput
+      echo "$replicas, $size, $lt" >> $latency
+      echo "$replicas, $size, $r, $tp" >> $rw
+    done
+  done
+
+  for osd in `ls $expath` ; do
+    for replicas in `ls $expath/$osd/` ; do
+      for size in `ls $expath/$osd/$replicas/` ; do
+        tp=`grep 'Bandwidth (MB/sec):' $expath/$osd/$replicas/$size/1_write.csv | sed 's/Bandwidth (MB\/sec): *//'`
+        echo "$osd, $replicas, $size, $tp" >> $scale
+      done
+    done
+  done
+  exit 0
+fi
+
+# Executes rados bench
+
+if [ "$#" -ne 0 ] ; then
+  echo "ERROR: unexpected arguments"
+fi
+
 if [ ! -n "$N" ]; then
   echo "ERROR: N must be defined as the number of replicas"
   exit 1
