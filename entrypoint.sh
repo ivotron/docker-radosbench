@@ -41,7 +41,7 @@ if [ "$#" -eq 1 ] && [ "$1" = "plot" ]; then
     for size in `ls $expath/$MAX_OSD/$replicas/` ; do
       tp=`grep 'Bandwidth (MB/sec):' $expath/$MAX_OSD/$replicas/$size/1_write.csv | sed 's/Bandwidth (MB\/sec): *//'`
       lt=`grep 'Average Latency:' $expath/$MAX_OSD/$replicas/$size/1_write.csv | sed 's/Average Latency: *//'`
-      r=`grep 'Bandwidth (MB/sec):' $expath/$MAX_OSD/$replicas/$size/1_seq.csv | sed 's/Bandwidth (MB\/sec) *//'`
+      r=`grep 'Bandwidth (MB/sec):' $expath/$MAX_OSD/$replicas/$size/1_seq.csv | sed 's/Bandwidth (MB\/sec): *//'`
       echo "$replicas, $size, $tp" >> $throughput
       echo "$replicas, $size, $lt" >> $latency
       echo "$replicas, $size, $r, $tp" >> $rw
