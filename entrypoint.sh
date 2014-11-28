@@ -1,64 +1,6 @@
 #!/bin/bash
 set -e
 
-if [ "$#" -eq 1 ] && [ "$1" = "csv" ]; then
-  # generates multiple graphs out of radosbench output
-  #
-  # expects to have results stored in the following folder structure:
-  #
-  #   results/experiment_name/osd_count/num_replica/obj_size/repetition_type.csv
-  #
-  # where
-
-  if [ ! -n "$RESULTS_PATH" ]; then
-    echo "ERROR: RESULTS_PATH must be defined"
-    exit 1
-  fi
-
-  if [ ! -n "$MAX_OSD" ]; then
-    echo "ERROR: MAX_OSD must be defined"
-    exit 1
-  fi
-
-  if [ ! -n "$EXPERIMENT" ]; then
-    echo "ERROR: EXPERIMENT must be defined"
-    exit 1
-  fi
-
-  throughput=${RESULTS_PATH}/${EXPERIMENT}_per-osd-write-throughput.csv
-  latency=${RESULTS_PATH}/${EXPERIMENT}_per-osd-write-latency.csv
-  rw=${RESULTS_PATH}/${EXPERIMENT}_per-osd-rw-throughput.csv
-  scale=${RESULTS_PATH}/${EXPERIMENT}_per-osd-scalable-throughput.csv
-  expath=$RESULTS_PATH/$EXPERIMENT
-
-  # create files
-  touch $throughput
-  touch $latency
-  touch $rw
-  touch $scale
-
-  for replicas in `ls $expath/$MAX_OSD/` ; do
-    for size in `ls $expath/$MAX_OSD/$replicas/` ; do
-      tp=`grep 'Bandwidth (MB/sec):' $expath/$MAX_OSD/$replicas/$size/write.csv | sed 's/Bandwidth (MB\/sec): *//'`
-      lt=`grep 'Average Latency:' $expath/$MAX_OSD/$replicas/$size/write.csv | sed 's/Average Latency: *//'`
-      r=`grep 'Bandwidth (MB/sec):' $expath/$MAX_OSD/$replicas/$size/seq.csv | sed 's/Bandwidth (MB\/sec): *//'`
-      echo "$replicas, $size, $tp" >> $throughput
-      echo "$replicas, $size, $lt" >> $latency
-      echo "$replicas, $size, $r, $tp" >> $rw
-    done
-  done
-
-  for osd in `ls $expath` ; do
-    for replicas in `ls $expath/$osd/` ; do
-      for size in `ls $expath/$osd/$replicas/` ; do
-        tp=`grep 'Bandwidth (MB/sec):' $expath/$osd/$replicas/$size/write.csv | sed 's/Bandwidth (MB\/sec): *//'`
-        echo "$osd, $replicas, $size, $tp" >> $scale
-      done
-    done
-  done
-  exit 0
-fi
-
 # Executes rados bench
 
 if [ "$#" -ne 0 ] ; then
@@ -119,28 +61,30 @@ else
 fi
 
 BASE_PATH="/data/${YEAR}_${MONTH}_${DAY}_${TIME}/${NUM_OSD}"
-for ((n=1; n<=N; n++)); do
 
-  # check if we have enough OSDs for replication
-  if [ "$NUM_OSD" -lt "$n" ] ; then
-    continue
-  fi
+# check if we have enough OSDs for replication
+if [ "$NUM_OSD" -lt "$n" ] ; then
+  continue
+fi
 
-  for size in $SIZE ; do
-    RESULTS_PATH="${BASE_PATH}/${n}/${size}/"
-    mkdir -p ${RESULTS_PATH}
-    POOL=perf
-    echo "===> CREATE POOL: ${POOL} (`date +%H:%M:%S`)"
-    /usr/bin/ceph osd pool create ${POOL} ${PGS} ${PGS}
-    /usr/bin/ceph osd pool set ${POOL} size ${n}
-    ceph_health
-    echo "===> RADOS BENCH WRITE TEST: START (`date +%H:%M:%S`)"
-    /usr/bin/rados bench ${SEC} write -b ${size} -p ${POOL} --no-cleanup > ${RESULTS_PATH}/write.csv
-    echo "===> RADOS BENCH WRITE TEST: END (`date +%H:%M:%S`)"
+for size in $SIZE ; do
+  RESULTS_PATH="${BASE_PATH}/${N}/${size}/"
+  mkdir -p ${RESULTS_PATH}
+  POOL=perf
+  echo "===> CREATE POOL: ${POOL} (`date +%H:%M:%S`)"
+  /usr/bin/ceph osd pool create ${POOL} ${PGS} ${PGS}
+  /usr/bin/ceph osd pool set ${POOL} size ${N}
+  ceph_health
+  echo "===> RADOS BENCH WRITE TEST: START (`date +%H:%M:%S`)"
+  /usr/bin/rados bench ${SEC} write -b ${size} -p ${POOL} --no-cleanup > ${RESULTS_PATH}/write.csv
+  echo "===> RADOS BENCH WRITE TEST: END (`date +%H:%M:%S`)"
+
+  if [ -n $SEQ ] ; then
     echo "===> RADOS BENCH SEQ TEST: START (`date +%H:%M:%S`)"
     /usr/bin/rados bench ${SEC} seq -b ${size} -p ${POOL} > ${RESULTS_PATH}/seq.csv
     echo "===> RADOS BENCH SEQ TEST: END (`date +%H:%M:%S`)"
-    /usr/bin/ceph osd pool delete ${POOL} ${POOL} --yes-i-really-really-mean-it
-    echo "===> DELETE POOL: ${POOL} (`date +%H:%M:%S`)"
-  done
+  fi
+
+  /usr/bin/ceph osd pool delete ${POOL} ${POOL} --yes-i-really-really-mean-it
+  echo "===> DELETE POOL: ${POOL} (`date +%H:%M:%S`)"
 done
