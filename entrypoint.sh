@@ -8,83 +8,29 @@ if [ "$#" -ne 0 ] ; then
   exit 1
 fi
 
-if [ ! -n "$N" ]; then
-  echo "ERROR: N must be defined as the number of replicas"
+if [ ! -n "$SIZE" ]; then
+  echo "ERROR: OBJ_SIZE must be defined as the object size"
   exit 1
 fi
 
-if [ ! -n "$SEC" ]; then
+if [ ! -n "$SECS" ]; then
   echo "ERROR: SEC must be defined as the number of seconds to execute for"
   exit 1
 fi
 
-if [ ! -n "$NUM_OSD" ]; then
-  echo "ERROR: NUM_OSD must be defined as the number of OSDs in the cluster"
+if [ ! -n "$TYPE" ]; then
+  echo "ERROR: TYPE must be one of write|seq|rand"
   exit 1
 fi
 
-if [ ! -n "$SIZE" ]; then
-  SIZE="4096 8192 16384 32768 65536 131072 262144 524288 1048576 2097152 4194304"
-fi
-
-if [ ! -d "/data" ]; then
-  echo "ERROR: folder '/data' doesn't exist"
+if [ ! -n "$POOL" ]; then
+  echo "ERROR: POOL must be defined"
   exit 1
 fi
 
-YEAR=`date +%Y`
-MONTH=`date +%m`
-DAY=`date +%d`
-TIME=`date +%H%M`
-
-ceph_health()
-{
-  echo -n "Waiting for pool operation to finish..."
-  while [ "$(/usr/bin/ceph health)" != "HEALTH_OK" ] ; do
-    sleep 2
-    echo -n "."
-  done
-  echo ""
-}
-
-# set PGS to the recommended values
-if [ "$NUM_OSD" -le 2 ] ; then
-  PGS=32
-elif [ "$NUM_OSD" -le 3 ] ; then
-  PGS=64
-elif [ "$NUM_OSD" -le 5 ] ; then
-  PGS=128
-elif [ "$NUM_OSD" -le 10 ] ; then
-  PGS=512
-else
-  PGS=4096
+if [ ! -d "$OUTFILE" ]; then
+  echo "ERROR: OUTFILE should point to output file"
+  exit 1
 fi
 
-BASE_PATH="/data/${YEAR}_${MONTH}_${DAY}_${TIME}/${NUM_OSD}"
-
-# check if we have enough OSDs for replication
-if [ "$NUM_OSD" -lt "$n" ] ; then
-  continue
-fi
-
-for size in $SIZE ; do
-  RESULTS_PATH="${BASE_PATH}/${N}/${size}/"
-  mkdir -p ${RESULTS_PATH}
-  POOL=perf
-  echo "===> CREATE POOL: ${POOL} (`date +%H:%M:%S`)"
-  /usr/bin/ceph osd pool create ${POOL} ${PGS} ${PGS}
-  /usr/bin/ceph osd pool set ${POOL} size ${N}
-  ceph_health
-  echo "===> RADOS BENCH WRITE TEST: START (`date +%H:%M:%S`)"
-  /usr/bin/rados bench ${SEC} write -b ${size} -p ${POOL} --no-cleanup > ${RESULTS_PATH}/write.csv
-  echo "===> RADOS BENCH WRITE TEST: END (`date +%H:%M:%S`)"
-
-  if [ -n $SEQ ] ; then
-    echo "===> RADOS BENCH SEQ TEST: START (`date +%H:%M:%S`)"
-    /usr/bin/rados bench ${SEC} seq -b ${size} -p ${POOL} > ${RESULTS_PATH}/seq.csv
-    echo "===> RADOS BENCH SEQ TEST: END (`date +%H:%M:%S`)"
-  fi
-
-  /usr/bin/ceph osd pool delete ${POOL} ${POOL} --yes-i-really-really-mean-it
-  echo "===> DELETE POOL: ${POOL} (`date +%H:%M:%S`)"
-done
+exec /usr/bin/rados bench ${SEC} ${TYPE} -b ${SIZE} -p ${POOL} --no-cleanup > $OUTFILE
