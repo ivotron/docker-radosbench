@@ -23,14 +23,19 @@ if [ ! -n "$TYPE" ]; then
   exit 1
 fi
 
+if [ ! -n "$THREADS" ]; then
+  echo "ERROR: THREADS must be defined"
+  exit 1
+fi
+
 if [ ! -n "$POOL" ]; then
   echo "ERROR: POOL must be defined"
   exit 1
 fi
 
-if [ ! -d "$OUTFILE" ]; then
+if [ ! -n "$OUTFILE" ]; then
   echo "ERROR: OUTFILE should point to output file"
   exit 1
 fi
 
-exec /usr/bin/rados bench ${SEC} ${TYPE} -b ${SIZE} -p ${POOL} --no-cleanup > $OUTFILE
+exec /usr/bin/rados -p ${POOL} bench ${SECS} ${TYPE} -b ${SIZE} -t $THREADS --no-cleanup > $OUTFILE
