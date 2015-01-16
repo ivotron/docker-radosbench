@@ -9,7 +9,7 @@ Example:
 
 ```bash
 docker run \
-  -e SEC=300 -e N=3 -e PGS=512 \
+  -e SECS=300 -e N=3 -e PGS=512  -e OUTFILE=/data/results.txt \
   -v $HOME/rados_results/:/data \
   -v /etc/ceph:/etc/ceph \
   ivotron/radosbench
